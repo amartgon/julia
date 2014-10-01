@@ -2,8 +2,6 @@ JULIAHOME = ..
 include ../deps/Versions.make
 include ../Make.inc
 
-PCRE_CONST = 0x[0-9a-fA-F]+|[-+]?\s*[0-9]+
-
 TAGGED_RELEASE_BANNER = ""
 
 ifneq ($(USEMSVC), 1)
@@ -14,12 +12,14 @@ endif
 
 all: pcre_h.jl errno_h.jl build_h.jl.phony fenv_constants.jl file_constants.jl uv_constants.jl version_git.jl.phony
 
-pcre_h.jl:
 ifeq ($(USE_SYSTEM_PCRE), 1)
-	@$(call PRINT_PERL, $(CPP) -dM $(shell $(PCRE_CONFIG) --prefix)/include/pcre.h | perl -nle '/^\s*#define\s+PCRE_(\w*)\s*\(?($(PCRE_CONST))\)?\s*$$/ and print "const $$1 = int32($$2)"' | sort > $@)
+  PCRE_H = $(shell $(PCRE_CONFIG) --prefix)/include/pcre.h
 else
-	@$(call PRINT_PERL, $(CPP) -dM $(build_includedir)/pcre.h | perl -nle '/^\s*#define\s+PCRE_(\w*)\s*\(?($(PCRE_CONST))\)?\s*$$/ and print "const $$1 = int32($$2)"' | sort > $@)
+  PCRE_H = $(build_includedir)/pcre.h
 endif
+pcre_h.jl:
+	@$(call PRINT_PERL, $(CPP) -dM $(PCRE_H) | perl -nle '/^\s*#define\s+PCRE_(\w+)\s+(0x\d+)\s*$$/ and print "const $$1 = uint32($$2)"' | sort > $@)
+	@$(call PRINT_PERL, $(CPP) -dM $(PCRE_H) | perl -nle '/^\s*#define\s+PCRE_(\w+)\s+\(?([-]?\d+)\)?\s*$$/ and print "const $$1 = int32($$2)"' | sort >> $@)
 
 errno_h.jl:
 	@$(call PRINT_PERL, echo '#include "errno.h"' | $(CPP) -dM - | perl -nle 'print "const $$1 = int32($$2)" if /^#define\s+(E\w+)\s+(\d+)\s*$$/' | sort > $@)
